@@ -1,0 +1,64 @@
+FlatCopy Profile Exporter License
+Copyright (c) 2026
+
+Permission is granted, free of charge, to any person or organization obtaining a copy
+of this software and associated documentation files (the "Software"), to use, copy,
+modify, and distribute the Software, subject to the conditions below.
+
+1. Permitted Use
+
+You may:
+
+- use the Software for personal purposes;
+- use the Software within a business or other organization for internal commercial or
+  non-commercial purposes;
+- modify the Software for your own use; and
+- share or redistribute the Software only if the redistribution is free of charge and
+  all license and attribution requirements in this license are preserved.
+
+2. Attribution Required
+
+Any copy or permitted redistribution of the Software, whether modified or unmodified,
+must include:
+
+- this license text;
+- the original copyright notice; and
+- clear attribution to the original project and author in documentation, an about page,
+  or another reasonable and visible location.
+
+3. Prohibited Uses
+
+You may not:
+
+- sell the Software;
+- charge a fee for the Software itself;
+- sublicense the Software for a fee;
+- include the Software in a product, bundle, or offering where payment is required in
+  exchange for access to the Software itself;
+- represent the Software as your own original work without attribution; or
+- remove or alter copyright or attribution notices.
+
+4. Distribution of Modified Versions
+
+If you distribute a modified version of the Software, you must:
+
+- clearly state that changes were made; and
+- not imply that the original author endorses your modified version.
+
+5. No Trademark or Endorsement Rights
+
+This license does not grant any right to use the name, branding, or trademarks of the
+original author except as reasonably necessary for attribution.
+
+6. Disclaimer of Warranty
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
+
+7. Limitation of Liability
+
+IN NO EVENT SHALL THE AUTHOR OR COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR
+OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM,
+OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

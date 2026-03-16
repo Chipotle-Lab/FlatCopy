@@ -1,0 +1,23 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v8.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v8.0": {
+      "FlatCopyProfileExporter/1.0.0": {
+        "runtime": {
+          "FlatCopyProfileExporter.dll": {}
+        }
+      }
+    }
+  },
+  "libraries": {
+    "FlatCopyProfileExporter/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

@@ -1,0 +1,14 @@
+D:\dev\flatcopy\bin\Debug\net8.0-windows\FlatCopyProfileExporter.exe
+D:\dev\flatcopy\bin\Debug\net8.0-windows\FlatCopyProfileExporter.deps.json
+D:\dev\flatcopy\bin\Debug\net8.0-windows\FlatCopyProfileExporter.runtimeconfig.json
+D:\dev\flatcopy\bin\Debug\net8.0-windows\FlatCopyProfileExporter.dll
+D:\dev\flatcopy\bin\Debug\net8.0-windows\FlatCopyProfileExporter.pdb
+D:\dev\flatcopy\obj\Debug\net8.0-windows\FlatCopyProfileExporter.GeneratedMSBuildEditorConfig.editorconfig
+D:\dev\flatcopy\obj\Debug\net8.0-windows\FlatCopyProfileExporter.AssemblyInfoInputs.cache
+D:\dev\flatcopy\obj\Debug\net8.0-windows\FlatCopyProfileExporter.AssemblyInfo.cs
+D:\dev\flatcopy\obj\Debug\net8.0-windows\FlatCopyProfileExporter.csproj.CoreCompileInputs.cache
+D:\dev\flatcopy\obj\Debug\net8.0-windows\FlatCopyProfileExporter.dll
+D:\dev\flatcopy\obj\Debug\net8.0-windows\refint\FlatCopyProfileExporter.dll
+D:\dev\flatcopy\obj\Debug\net8.0-windows\FlatCopyProfileExporter.pdb
+D:\dev\flatcopy\obj\Debug\net8.0-windows\FlatCopyProfileExporter.genruntimeconfig.cache
+D:\dev\flatcopy\obj\Debug\net8.0-windows\ref\FlatCopyProfileExporter.dll
