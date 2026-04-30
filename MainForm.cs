@@ -87,7 +87,6 @@ public partial class MainForm : Form
 
         bool copyWholeProfile = copyWholeProfileCheckBox.Checked;
         bool requireBitLocker = requireBitLockerCheckBox.Checked;
-        bool encryptWithEfs = encryptWithEfsCheckBox.Checked;
 
         if (!copyWholeProfile && selectedFolders.Count == 0)
         {
@@ -132,21 +131,6 @@ public partial class MainForm : Form
             }
         }
 
-        if (encryptWithEfs)
-        {
-            EfsSupportResult efsSupport = WindowsSecurityService.GetEfsSupportStatus(destinationRoot);
-            if (!efsSupport.IsSupported)
-            {
-                MessageBox.Show(
-                    this,
-                    $"Windows EFS is not available for the selected destination.\r\n\r\n{efsSupport.Details}",
-                    "EFS Not Available",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
-                return;
-            }
-        }
-
         Directory.CreateDirectory(destinationRoot);
 
         string logPath = Path.Combine(destinationRoot, $"FlatCopyLog_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
@@ -170,7 +154,7 @@ public partial class MainForm : Form
                 : $"Selected folders: {string.Join(", ", selectedFolders.Select(folder => folder.DisplayName))}");
             ProfileCopyService.WriteLog(logWriter, $"Overwrite existing files: {overwriteCheckBox.Checked}");
             ProfileCopyService.WriteLog(logWriter, $"Require BitLocker destination: {requireBitLocker}");
-            ProfileCopyService.WriteLog(logWriter, $"Encrypt copied data with Windows EFS: {encryptWithEfs}");
+            ProfileCopyService.WriteLog(logWriter, "Safe overwrite mode: staged temp files with atomic replace/move.");
 
             var statusProgress = new Progress<string>(message =>
             {
@@ -180,13 +164,13 @@ public partial class MainForm : Form
 
             copyProgressBar.Style = ProgressBarStyle.Marquee;
             statusLabel.Text = copyWholeProfile ? "Scanning selected profiles..." : "Scanning selected folders...";
-            summaryLabel.Text = copyWholeProfile ? "Building the full-profile copy plan..." : "Building the copy plan...";
+            summaryLabel.Text = copyWholeProfile ? "Scanning the full-profile copy workload..." : "Scanning the copy workload...";
 
-            CopyPlan plan = await Task.Run(
-                () => ProfileCopyService.BuildCopyPlan(selectedProfiles, selectedFolders, destinationRoot, copyWholeProfile, logWriter, _copyCancellationTokenSource.Token, statusProgress),
+            CopyScanSummary scanSummary = await Task.Run(
+                () => ProfileCopyService.BuildCopyScanSummary(selectedProfiles, selectedFolders, destinationRoot, copyWholeProfile, logWriter, _copyCancellationTokenSource.Token, statusProgress),
                 _copyCancellationTokenSource.Token);
 
-            if (plan.Files.Count == 0)
+            if (scanSummary.TotalFiles == 0)
             {
                 statusLabel.Text = "Nothing to copy.";
                 summaryLabel.Text = copyWholeProfile
@@ -208,33 +192,17 @@ public partial class MainForm : Form
 
             copyProgressBar.Style = ProgressBarStyle.Continuous;
             copyProgressBar.Value = 0;
-            summaryLabel.Text = $"{plan.Files.Count:N0} file(s) queued, {FormatBytes(plan.TotalBytes)} total.";
+            summaryLabel.Text = $"{scanSummary.TotalFiles:N0} file(s) queued, {FormatBytes(scanSummary.TotalBytes)} total.";
 
             var copyProgress = new Progress<CopyProgressInfo>(UpdateProgressDisplay);
 
-            CopyExecutionSummary result = await ProfileCopyService.ExecuteCopyPlanAsync(
-                plan,
+            CopyExecutionSummary result = await ProfileCopyService.ExecuteCopyAsync(
+                scanSummary,
                 overwriteCheckBox.Checked,
                 logWriter,
                 copyProgress,
                 statusProgress,
                 _copyCancellationTokenSource.Token);
-
-            if (encryptWithEfs)
-            {
-                copyProgressBar.Style = ProgressBarStyle.Marquee;
-                statusLabel.Text = "Encrypting copied data with Windows EFS...";
-                summaryLabel.Text = "Applying EFS to the copied output and log file...";
-                AppendActivity("Applying Windows EFS encryption to the copied output.");
-
-                await Task.Run(
-                    () => WindowsSecurityService.EncryptOutputWithEfs(
-                        BuildEfsTargets(selectedProfiles, selectedFolders, destinationRoot, copyWholeProfile),
-                        logPath,
-                        logWriter,
-                        _copyCancellationTokenSource.Token),
-                    _copyCancellationTokenSource.Token);
-            }
 
             copyProgressBar.Style = ProgressBarStyle.Continuous;
             copyProgressBar.Value = copyProgressBar.Maximum;
@@ -284,13 +252,11 @@ public partial class MainForm : Form
 
     private bool ValidateDestination(IReadOnlyList<UserProfileInfo> selectedProfiles, string destinationRoot)
     {
-        string normalizedDestination = Path.GetFullPath(destinationRoot)
-            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        string normalizedDestination = NormalizeDirectoryPath(destinationRoot);
 
         foreach (UserProfileInfo profile in selectedProfiles)
         {
-            string normalizedProfile = Path.GetFullPath(profile.ProfilePath)
-                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string normalizedProfile = NormalizeDirectoryPath(profile.ProfilePath);
 
             if (normalizedDestination.StartsWith(normalizedProfile, StringComparison.OrdinalIgnoreCase))
             {
@@ -326,7 +292,6 @@ public partial class MainForm : Form
         overwriteCheckBox.Enabled = !isBusy;
         copyWholeProfileCheckBox.Enabled = !isBusy;
         requireBitLockerCheckBox.Enabled = !isBusy;
-        encryptWithEfsCheckBox.Enabled = !isBusy;
         startCopyButton.Enabled = !isBusy;
         cancelCopyButton.Enabled = isBusy;
 
@@ -430,31 +395,6 @@ public partial class MainForm : Form
         }
     }
 
-    private static IReadOnlyList<string> BuildEfsTargets(
-        IReadOnlyList<UserProfileInfo> selectedProfiles,
-        IReadOnlyList<KnownFolderOption> selectedFolders,
-        string destinationRoot,
-        bool copyWholeProfile)
-    {
-        HashSet<string> targets = new(StringComparer.OrdinalIgnoreCase);
-
-        foreach (UserProfileInfo profile in selectedProfiles)
-        {
-            if (copyWholeProfile)
-            {
-                targets.Add(Path.Combine(destinationRoot, profile.Name));
-                continue;
-            }
-
-            foreach (KnownFolderOption folder in selectedFolders)
-            {
-                targets.Add(Path.Combine(destinationRoot, profile.Name, folder.DisplayName));
-            }
-        }
-
-        return targets.ToList();
-    }
-
     private void CopyWholeProfileCheckBox_CheckedChanged(object? sender, EventArgs e)
     {
         UpdateWholeProfileModeState();
@@ -480,5 +420,12 @@ public partial class MainForm : Form
     private void CancelCopyButton_Click(object? sender, EventArgs e)
     {
         _copyCancellationTokenSource?.Cancel();
+    }
+
+    private static string NormalizeDirectoryPath(string path)
+    {
+        string fullPath = Path.GetFullPath(path)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        return fullPath + Path.DirectorySeparatorChar;
     }
 }

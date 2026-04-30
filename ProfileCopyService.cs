@@ -47,7 +47,7 @@ internal static class ProfileCopyService
         return profiles;
     }
 
-    public static CopyPlan BuildCopyPlan(
+    public static CopyScanSummary BuildCopyScanSummary(
         IReadOnlyList<UserProfileInfo> selectedProfiles,
         IReadOnlyList<KnownFolderOption> selectedFolders,
         string destinationRoot,
@@ -56,117 +56,108 @@ internal static class ProfileCopyService
         CancellationToken cancellationToken,
         IProgress<string>? statusProgress)
     {
-        CopyPlan plan = new();
+        List<CopySourceRoot> roots = BuildCopyRoots(selectedProfiles, selectedFolders, destinationRoot, copyWholeProfile, logWriter);
+        int totalFiles = 0;
+        int totalDirectories = 0;
+        long totalBytes = 0;
 
-        foreach (UserProfileInfo profile in selectedProfiles)
+        foreach (CopySourceRoot root in roots)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            statusProgress?.Report($"Scanning {root.DisplayPath}...");
 
-            if (copyWholeProfile)
+            foreach (CopyEntry entry in EnumerateCopyEntries(root, logWriter, cancellationToken))
             {
-                string sourceRoot = profile.ProfilePath;
-                string destinationFolder = Path.Combine(destinationRoot, profile.Name);
-                statusProgress?.Report($"Scanning {profile.Name}\\entire profile...");
-                plan.Directories.Add(destinationFolder);
-                CollectItemsRecursive(sourceRoot, destinationFolder, profile.Name, plan, logWriter, cancellationToken);
-                continue;
-            }
-
-            foreach (KnownFolderOption folder in selectedFolders)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                string sourceRoot = Path.Combine(profile.ProfilePath, folder.RelativePath);
-                string destinationFolder = Path.Combine(destinationRoot, profile.Name, folder.DisplayName);
-
-                statusProgress?.Report($"Scanning {profile.Name}\\{folder.DisplayName}...");
-
-                if (!Directory.Exists(sourceRoot))
+                if (entry.IsDirectory)
                 {
-                    WriteLog(logWriter, $"Skipped missing folder: {sourceRoot}");
+                    totalDirectories++;
                     continue;
                 }
 
-                plan.Directories.Add(destinationFolder);
-                CollectItemsRecursive(sourceRoot, destinationFolder, $"{profile.Name}\\{folder.DisplayName}", plan, logWriter, cancellationToken);
+                totalFiles++;
+                totalBytes += entry.Length;
             }
         }
 
-        WriteLog(logWriter, $"Scan complete. Planned {plan.Files.Count:N0} file(s), {plan.Directories.Count:N0} directory(s), {plan.TotalBytes:N0} byte(s).");
-        return plan;
+        WriteLog(logWriter, $"Scan complete. Planned {totalFiles:N0} file(s), {totalDirectories:N0} directory(s), {totalBytes:N0} byte(s).");
+        return new CopyScanSummary(roots, totalFiles, totalDirectories, totalBytes);
     }
 
-    public static async Task<CopyExecutionSummary> ExecuteCopyPlanAsync(
-        CopyPlan plan,
+    public static async Task<CopyExecutionSummary> ExecuteCopyAsync(
+        CopyScanSummary scanSummary,
         bool overwriteExisting,
         TextWriter logWriter,
         IProgress<CopyProgressInfo>? progress,
         IProgress<string>? statusProgress,
         CancellationToken cancellationToken)
     {
-        foreach (string directoryPath in plan.Directories.OrderBy(path => path.Length).ThenBy(path => path, StringComparer.OrdinalIgnoreCase))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            Directory.CreateDirectory(directoryPath);
-        }
-
         int copiedFiles = 0;
         int skippedFiles = 0;
         int failedFiles = 0;
         int filesProcessed = 0;
         long bytesProcessed = 0;
 
-        foreach (CopyPlanItem item in plan.Files)
+        foreach (CopySourceRoot root in scanSummary.Roots)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            statusProgress?.Report($"Copying {item.DisplayPath}");
-
-            try
+            foreach (CopyEntry entry in EnumerateCopyEntries(root, logWriter, cancellationToken))
             {
-                Directory.CreateDirectory(Path.GetDirectoryName(item.DestinationPath)!);
+                cancellationToken.ThrowIfCancellationRequested();
 
-                if (!overwriteExisting && File.Exists(item.DestinationPath))
+                if (entry.IsDirectory)
                 {
-                    skippedFiles++;
-                    bytesProcessed += item.Length;
-                    filesProcessed++;
-                    WriteLog(logWriter, $"Skipped existing file: {item.DestinationPath}");
-                    progress?.Report(new CopyProgressInfo(bytesProcessed, plan.TotalBytes, filesProcessed, plan.Files.Count, $"Skipped {item.DisplayPath}"));
+                    Directory.CreateDirectory(entry.DestinationPath);
                     continue;
                 }
 
-                await CopyFileWithProgressAsync(
-                    item.SourcePath,
-                    item.DestinationPath,
-                    overwriteExisting,
-                    copiedInCurrentFile =>
-                    {
-                        progress?.Report(new CopyProgressInfo(
-                            bytesProcessed + copiedInCurrentFile,
-                            plan.TotalBytes,
-                            filesProcessed,
-                            plan.Files.Count,
-                            $"Copying {item.DisplayPath}"));
-                    },
-                    cancellationToken);
+                statusProgress?.Report($"Copying {entry.DisplayPath}");
 
-                copiedFiles++;
-                bytesProcessed += item.Length;
-                filesProcessed++;
-                WriteLog(logWriter, $"Copied: {item.SourcePath} -> {item.DestinationPath} ({item.Length:N0} bytes)");
-                progress?.Report(new CopyProgressInfo(bytesProcessed, plan.TotalBytes, filesProcessed, plan.Files.Count, $"Copied {item.DisplayPath}"));
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception exception)
-            {
-                failedFiles++;
-                bytesProcessed += item.Length;
-                filesProcessed++;
-                WriteLog(logWriter, $"Failed: {item.SourcePath} -> {item.DestinationPath} :: {exception.Message}");
-                progress?.Report(new CopyProgressInfo(bytesProcessed, plan.TotalBytes, filesProcessed, plan.Files.Count, $"Failed {item.DisplayPath}"));
+                try
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(entry.DestinationPath)!);
+
+                    if (!overwriteExisting && File.Exists(entry.DestinationPath))
+                    {
+                        skippedFiles++;
+                        bytesProcessed += entry.Length;
+                        filesProcessed++;
+                        WriteLog(logWriter, $"Skipped existing file: {entry.DestinationPath}");
+                        progress?.Report(new CopyProgressInfo(bytesProcessed, scanSummary.TotalBytes, filesProcessed, scanSummary.TotalFiles, $"Skipped {entry.DisplayPath}"));
+                        continue;
+                    }
+
+                    await CopyFileWithProgressAsync(
+                        entry.SourcePath,
+                        entry.DestinationPath,
+                        overwriteExisting,
+                        copiedInCurrentFile =>
+                        {
+                            progress?.Report(new CopyProgressInfo(
+                                bytesProcessed + copiedInCurrentFile,
+                                scanSummary.TotalBytes,
+                                filesProcessed,
+                                scanSummary.TotalFiles,
+                                $"Copying {entry.DisplayPath}"));
+                        },
+                        cancellationToken);
+
+                    copiedFiles++;
+                    bytesProcessed += entry.Length;
+                    filesProcessed++;
+                    WriteLog(logWriter, $"Copied: {entry.SourcePath} -> {entry.DestinationPath} ({entry.Length:N0} bytes)");
+                    progress?.Report(new CopyProgressInfo(bytesProcessed, scanSummary.TotalBytes, filesProcessed, scanSummary.TotalFiles, $"Copied {entry.DisplayPath}"));
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    failedFiles++;
+                    bytesProcessed += entry.Length;
+                    filesProcessed++;
+                    WriteLog(logWriter, $"Failed: {entry.SourcePath} -> {entry.DestinationPath} :: {exception.Message}");
+                    progress?.Report(new CopyProgressInfo(bytesProcessed, scanSummary.TotalBytes, filesProcessed, scanSummary.TotalFiles, $"Failed {entry.DisplayPath}"));
+                }
             }
         }
 
@@ -179,22 +170,86 @@ internal static class ProfileCopyService
         writer.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}");
     }
 
-    private static void CollectItemsRecursive(
+    private static List<CopySourceRoot> BuildCopyRoots(
+        IReadOnlyList<UserProfileInfo> selectedProfiles,
+        IReadOnlyList<KnownFolderOption> selectedFolders,
+        string destinationRoot,
+        bool copyWholeProfile,
+        TextWriter logWriter)
+    {
+        List<CopySourceRoot> roots = [];
+
+        foreach (UserProfileInfo profile in selectedProfiles)
+        {
+            if (copyWholeProfile)
+            {
+                TryAddCopyRoot(
+                    roots,
+                    profile.ProfilePath,
+                    Path.Combine(destinationRoot, profile.Name),
+                    profile.Name,
+                    logWriter);
+                continue;
+            }
+
+            foreach (KnownFolderOption folder in selectedFolders)
+            {
+                TryAddCopyRoot(
+                    roots,
+                    Path.Combine(profile.ProfilePath, folder.RelativePath),
+                    Path.Combine(destinationRoot, profile.Name, folder.DisplayName),
+                    $"{profile.Name}\\{folder.DisplayName}",
+                    logWriter);
+            }
+        }
+
+        return roots;
+    }
+
+    private static void TryAddCopyRoot(
+        ICollection<CopySourceRoot> roots,
         string sourceRoot,
         string destinationRoot,
-        string displayPrefix,
-        CopyPlan plan,
+        string displayPath,
+        TextWriter logWriter)
+    {
+        if (!Directory.Exists(sourceRoot))
+        {
+            WriteLog(logWriter, $"Skipped missing folder: {sourceRoot}");
+            return;
+        }
+
+        try
+        {
+            DirectoryInfo directoryInfo = new(sourceRoot);
+            if (directoryInfo.Attributes.HasFlag(FileAttributes.ReparsePoint))
+            {
+                WriteLog(logWriter, $"Skipped reparse-point directory: {sourceRoot}");
+                return;
+            }
+
+            roots.Add(new CopySourceRoot(sourceRoot, destinationRoot, displayPath));
+        }
+        catch (Exception exception)
+        {
+            WriteLog(logWriter, $"Unable to inspect directory {sourceRoot}: {exception.Message}");
+        }
+    }
+
+    private static IEnumerable<CopyEntry> EnumerateCopyEntries(
+        CopySourceRoot root,
         TextWriter logWriter,
         CancellationToken cancellationToken)
     {
         Stack<(string SourcePath, string DestinationPath)> pending = new();
-        pending.Push((sourceRoot, destinationRoot));
+        pending.Push((root.SourcePath, root.DestinationPath));
 
         while (pending.Count > 0)
         {
             cancellationToken.ThrowIfCancellationRequested();
             (string currentSourcePath, string currentDestinationPath) = pending.Pop();
-            plan.Directories.Add(currentDestinationPath);
+            string currentDisplayPath = BuildDisplayPath(root.SourcePath, root.DisplayPath, currentSourcePath);
+            yield return new CopyEntry(currentSourcePath, currentDestinationPath, currentDisplayPath, 0, true);
 
             IEnumerable<string> childDirectories;
             try
@@ -242,23 +297,34 @@ internal static class ProfileCopyService
             foreach (string childFile in childFiles)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                CopyEntry? fileEntry = null;
 
                 try
                 {
                     FileInfo fileInfo = new(childFile);
                     string destinationFile = Path.Combine(currentDestinationPath, fileInfo.Name);
-                    string relativePath = Path.GetRelativePath(sourceRoot, childFile);
-                    string displayPath = $"{displayPrefix}\\{relativePath}";
-
-                    plan.Files.Add(new CopyPlanItem(childFile, destinationFile, displayPath, fileInfo.Length));
-                    plan.TotalBytes += fileInfo.Length;
+                    string displayPath = BuildDisplayPath(root.SourcePath, root.DisplayPath, childFile);
+                    fileEntry = new CopyEntry(childFile, destinationFile, displayPath, fileInfo.Length, false);
                 }
                 catch (Exception exception)
                 {
                     WriteLog(logWriter, $"Unable to inspect file {childFile}: {exception.Message}");
                 }
+
+                if (fileEntry is not null)
+                {
+                    yield return fileEntry;
+                }
             }
         }
+    }
+
+    private static string BuildDisplayPath(string sourceRoot, string displayRoot, string fullPath)
+    {
+        string relativePath = Path.GetRelativePath(sourceRoot, fullPath);
+        return relativePath == "."
+            ? displayRoot
+            : $"{displayRoot}\\{relativePath}";
     }
 
     private static async Task CopyFileWithProgressAsync(
@@ -268,7 +334,11 @@ internal static class ProfileCopyService
         Action<long> reportBytesCopied,
         CancellationToken cancellationToken)
     {
-        FileMode destinationMode = overwriteExisting ? FileMode.Create : FileMode.CreateNew;
+        string destinationDirectory = Path.GetDirectoryName(destinationPath)
+            ?? throw new InvalidOperationException($"Unable to determine the destination directory for {destinationPath}.");
+        string temporaryDestinationPath = Path.Combine(
+            destinationDirectory,
+            $"{Path.GetFileName(destinationPath)}.flatcopy-partial-{Guid.NewGuid():N}");
 
         await using FileStream sourceStream = new(
             sourcePath,
@@ -281,11 +351,11 @@ internal static class ProfileCopyService
             });
 
         await using FileStream destinationStream = new(
-            destinationPath,
+            temporaryDestinationPath,
             new FileStreamOptions
             {
                 Access = FileAccess.Write,
-                Mode = destinationMode,
+                Mode = FileMode.CreateNew,
                 Share = FileShare.None,
                 Options = FileOptions.SequentialScan
             });
@@ -309,11 +379,38 @@ internal static class ProfileCopyService
             }
 
             await destinationStream.FlushAsync(cancellationToken);
-            File.SetLastWriteTimeUtc(destinationPath, File.GetLastWriteTimeUtc(sourcePath));
+            File.SetLastWriteTimeUtc(temporaryDestinationPath, File.GetLastWriteTimeUtc(sourcePath));
+            FinalizeCopiedFile(temporaryDestinationPath, destinationPath, overwriteExisting);
         }
         finally
         {
             ArrayPool<byte>.Shared.Return(buffer, clearArray: false);
+            TryDeleteTemporaryFile(temporaryDestinationPath);
+        }
+    }
+
+    private static void FinalizeCopiedFile(string temporaryDestinationPath, string destinationPath, bool overwriteExisting)
+    {
+        if (overwriteExisting && File.Exists(destinationPath))
+        {
+            File.Replace(temporaryDestinationPath, destinationPath, null, ignoreMetadataErrors: true);
+            return;
+        }
+
+        File.Move(temporaryDestinationPath, destinationPath, overwriteExisting);
+    }
+
+    private static void TryDeleteTemporaryFile(string temporaryDestinationPath)
+    {
+        try
+        {
+            if (File.Exists(temporaryDestinationPath))
+            {
+                File.Delete(temporaryDestinationPath);
+            }
+        }
+        catch
+        {
         }
     }
 }

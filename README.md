@@ -13,7 +13,7 @@ FlatCopy Profile Exporter is a Windows 10/11 desktop utility for copying user-pr
 - Progress tracking during long copy jobs
 - Plain-text log written to the destination folder
 - Optional destination-drive BitLocker requirement
-- Optional Windows EFS encryption for copied output
+- Temp-file staging to avoid partial output or destructive overwrites
 - Skip reparse-point directories to avoid recursion problems
 
 ## Supported Folder Mode
@@ -71,6 +71,7 @@ The log includes:
 - start time
 - selected profiles
 - selected mode
+- overwrite mode
 - missing folders
 - skipped files
 - copy failures
@@ -78,18 +79,15 @@ The log includes:
 
 ## Optional Security Controls
 
-The app includes two optional Windows security controls:
+The app includes one optional Windows security control:
 
 - `Require BitLocker-protected destination`
   - Verifies that the destination volume reports BitLocker protection before the copy begins.
-- `Encrypt copied data with Windows EFS`
-  - Applies Windows Encrypting File System (EFS) encryption to the copied output folders and the generated log file after the copy completes.
 
 Notes:
 
-- EFS requires an `NTFS` destination volume.
 - BitLocker verification depends on Windows being able to report the destination volume status.
-- These options use built-in Windows security features. They are intentionally labeled as `BitLocker` and `EFS` rather than as a formal certification claim.
+- This option uses a built-in Windows security feature and is intentionally labeled as `BitLocker` rather than as a formal certification claim.
 
 ## Build
 
@@ -117,11 +115,11 @@ bin\Release\net8.0-windows\win-x64\publish\FlatCopyProfileExporter.exe
 
 - The app does not compress, archive, or package files.
 - The destination folder cannot be inside a selected source profile.
+- Files are copied to temporary paths first and then moved into place so canceled or failed runs do not leave partial destination files behind.
 - Some locked or protected files may still fail to copy depending on permissions.
-- EFS encryption may not be available on all Windows editions or destination filesystems.
 
 ## License
 
 This project uses a custom license that allows personal use, internal commercial use,
 modification, and free redistribution with attribution, but does not allow selling the
-software itself. See [LICENSE.txt](D:/dev/flatcopy/LICENSE.txt).
+software itself. See [LICENSE.txt](LICENSE.txt).

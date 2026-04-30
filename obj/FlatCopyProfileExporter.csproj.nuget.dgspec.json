@@ -10,14 +10,14 @@
         "projectUniqueName": "D:\\dev\\flatcopy\\FlatCopyProfileExporter.csproj",
         "projectName": "FlatCopyProfileExporter",
         "projectPath": "D:\\dev\\flatcopy\\FlatCopyProfileExporter.csproj",
-        "packagesPath": "D:\\dev\\flatcopy\\.dotnet\\.nuget\\packages\\",
+        "packagesPath": "d:\\dev\\flatcopy\\.dotnet\\.nuget\\packages\\",
         "outputPath": "D:\\dev\\flatcopy\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
         ],
         "configFilePaths": [
-          "D:\\dev\\flatcopy\\.appdata\\NuGet\\NuGet.Config",
+          "C:\\Users\\jburishkin\\AppData\\Roaming\\NuGet\\NuGet.Config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],

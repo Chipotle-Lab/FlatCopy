@@ -28,7 +28,6 @@ partial class MainForm
     private CheckBox overwriteCheckBox = null!;
     private FlowLayoutPanel securityOptionsPanel = null!;
     private CheckBox requireBitLockerCheckBox = null!;
-    private CheckBox encryptWithEfsCheckBox = null!;
     private FlowLayoutPanel actionsPanel = null!;
     private Button startCopyButton = null!;
     private Button cancelCopyButton = null!;
@@ -76,7 +75,6 @@ partial class MainForm
         overwriteCheckBox = new CheckBox();
         securityOptionsPanel = new FlowLayoutPanel();
         requireBitLockerCheckBox = new CheckBox();
-        encryptWithEfsCheckBox = new CheckBox();
         actionsPanel = new FlowLayoutPanel();
         startCopyButton = new Button();
         cancelCopyButton = new Button();
@@ -381,11 +379,10 @@ partial class MainForm
         //
         securityOptionsPanel.AutoSize = true;
         securityOptionsPanel.Controls.Add(requireBitLockerCheckBox);
-        securityOptionsPanel.Controls.Add(encryptWithEfsCheckBox);
         securityOptionsPanel.Dock = DockStyle.Fill;
         securityOptionsPanel.Location = new Point(3, 32);
         securityOptionsPanel.Margin = new Padding(3, 3, 3, 0);
-        securityOptionsPanel.Size = new Size(1128, 29);
+        securityOptionsPanel.Size = new Size(1128, 25);
         securityOptionsPanel.TabIndex = 4;
         //
         // requireBitLockerCheckBox
@@ -396,15 +393,6 @@ partial class MainForm
         requireBitLockerCheckBox.TabIndex = 0;
         requireBitLockerCheckBox.Text = "Require BitLocker-protected destination";
         requireBitLockerCheckBox.UseVisualStyleBackColor = true;
-        //
-        // encryptWithEfsCheckBox
-        //
-        encryptWithEfsCheckBox.AutoSize = true;
-        encryptWithEfsCheckBox.Location = new Point(255, 3);
-        encryptWithEfsCheckBox.Size = new Size(275, 19);
-        encryptWithEfsCheckBox.TabIndex = 1;
-        encryptWithEfsCheckBox.Text = "Encrypt copied data with Windows EFS";
-        encryptWithEfsCheckBox.UseVisualStyleBackColor = true;
         //
         // actionsPanel
         //

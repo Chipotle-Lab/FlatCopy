@@ -10,18 +10,23 @@ internal sealed record KnownFolderOption(string DisplayName, string RelativePath
     public override string ToString() => DisplayName;
 }
 
-internal sealed record CopyPlanItem(
+internal sealed record CopySourceRoot(
+    string SourcePath,
+    string DestinationPath,
+    string DisplayPath);
+
+internal sealed record CopyEntry(
     string SourcePath,
     string DestinationPath,
     string DisplayPath,
-    long Length);
+    long Length,
+    bool IsDirectory);
 
-internal sealed class CopyPlan
-{
-    public HashSet<string> Directories { get; } = new(StringComparer.OrdinalIgnoreCase);
-    public List<CopyPlanItem> Files { get; } = [];
-    public long TotalBytes { get; set; }
-}
+internal sealed record CopyScanSummary(
+    IReadOnlyList<CopySourceRoot> Roots,
+    int TotalFiles,
+    int TotalDirectories,
+    long TotalBytes);
 
 internal sealed record CopyProgressInfo(
     long BytesProcessed,
